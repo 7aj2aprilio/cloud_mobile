@@ -2,78 +2,67 @@ pipeline {
   agent any
 
   environment {
-    // Ganti default sesuai akunmu
-    DOCKERHUB_REPO = credentials('dockerhub-creds') // bind user/pass
-    IMAGE_NAME     = "pioaprilio/dockerparktikum"                  // nama image
-    DOCKERHUB_USER = ""                             // diisi otomatis di withCredentials
-    DOCKERHUB_PASS = ""                             // diisi otomatis di withCredentials
+    IMAGE_DEV = "pioaprilio/cloud_mobile"
+    IMAGE_WEB = "pioaprilio/cloud_mobile-web"
   }
-
-  options { timestamps() }
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        // Ambil kode dari GitHub repo
+        checkout([
+          $class: 'GitSCM',
+          branches: [[name: '*/main']],
+          userRemoteConfigs: [[
+            url: 'https://github.com/7aj2aprilio/cloud_mobile.git'
+          ]]
+        ])
+      }
     }
 
-    stage('Build Image (dev)') {
+    stage('Docker Login') {
       steps {
-        script {
-          def tag = "${env.BUILD_NUMBER}"
-          sh """
-            docker build -t ${env.JOB_NAME}:${tag} -t ${env.JOB_NAME}:latest --target dev .
-          """
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                          usernameVariable: 'DOCKERHUB_USER',
+                                          passwordVariable: 'DOCKERHUB_PASS')]) {
+          bat '''
+          echo %DOCKERHUB_PASS% | docker login -u %DOCKERHUB_USER% --password-stdin
+          '''
         }
       }
     }
 
-    stage('Login Docker Hub') {
+    stage('Build Dev Image') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-          sh 'echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin'
-        }
+        bat '''
+        docker build -t pioaprilio/cloud_mobile:%BUILD_NUMBER% -t pioaprilio/cloud_mobile:latest --target dev .
+        '''
       }
     }
 
-    stage('Tag & Push') {
+    stage('Push Dev Image') {
       steps {
-        script {
-          def user = sh(script: 'echo $DOCKERHUB_USER', returnStdout: true).trim()
-          def repo = "${user}/${env.JOB_NAME.toLowerCase()}"  // contoh: user/jobname
-          def tag  = "${env.BUILD_NUMBER}"
-
-          sh """
-            docker tag ${env.JOB_NAME}:latest ${repo}:${tag}
-            docker tag ${env.JOB_NAME}:latest ${repo}:latest
-            docker push ${repo}:${tag}
-            docker push ${repo}:latest
-          """
-        }
+        bat '''
+        docker push pioaprilio/cloud_mobile:%BUILD_NUMBER%
+        docker push pioaprilio/cloud_mobile:latest
+        '''
       }
     }
 
-    // (Opsional) Build varian web juga
-    stage('Build & Push Web Variant') {
-      when { expression { return true } } // set false kalau tidak perlu
+    stage('Build & Push Web Image') {
       steps {
-        script {
-          def user = sh(script: 'echo $DOCKERHUB_USER', returnStdout: true).trim()
-          def repo = "${user}/${env.JOB_NAME.toLowerCase()}-web"
-          def tag  = "${env.BUILD_NUMBER}"
-
-          sh """
-            docker build -t ${repo}:${tag} -t ${repo}:latest --target web .
-            docker push ${repo}:${tag}
-            docker push ${repo}:latest
-          """
-        }
+        bat '''
+        docker build -t pioaprilio/cloud_mobile-web:%BUILD_NUMBER% -t pioaprilio/cloud_mobile-web:latest --target web .
+        docker push pioaprilio/cloud_mobile-web:%BUILD_NUMBER%
+        docker push pioaprilio/cloud_mobile-web:latest
+        '''
       }
     }
   }
 
   post {
     always {
-      sh 'docker logout || true'
+      bat 'docker logout || ver >NUL'
     }
   }
 }
