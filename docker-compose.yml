@@ -1,4 +1,5 @@
 version: "3.9"
+
 services:
   mobile:
     build:
@@ -6,9 +7,9 @@ services:
       target: dev
     container_name: expo-mobile
     ports:
-      - "19000:19000"   # Metro/Expo
-      - "19001:19001"   # Debugger
-      - "19002:19002"   # DevTools
+      - "19000:19000"
+      - "19001:19001"
+      - "19002:19002"
     environment:
       EXPO_DEVTOOLS_LISTEN_ADDRESS: 0.0.0.0
       REACT_NATIVE_PACKAGER_HOSTNAME: 0.0.0.0
