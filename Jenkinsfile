@@ -4,7 +4,7 @@ pipeline {
   environment {
     // Ganti default sesuai akunmu
     DOCKERHUB_REPO = credentials('dockerhub-creds') // bind user/pass
-    IMAGE_NAME     = "expo-mobile"                  // nama image
+    IMAGE_NAME     = "pioaprilio/dockerparktikum"                  // nama image
     DOCKERHUB_USER = ""                             // diisi otomatis di withCredentials
     DOCKERHUB_PASS = ""                             // diisi otomatis di withCredentials
   }
