@@ -2,67 +2,57 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_DEV = "pioaprilio/cloud_mobile"
-    IMAGE_WEB = "pioaprilio/cloud_mobile-web"
+    IMAGE_NAME = 'pioaprilio/cloud_mobile'
+    REGISTRY_CREDENTIALS = 'dockerhub-credentials'
   }
 
   stages {
+
     stage('Checkout') {
       steps {
-        // Ambil kode dari GitHub repo
-        checkout([
-          $class: 'GitSCM',
-          branches: [[name: '*/main']],
-          userRemoteConfigs: [[
-            url: 'https://github.com/7aj2aprilio/cloud_mobile.git'
-          ]]
-        ])
+        echo 'Checkout source code...'
+        checkout scm
       }
     }
 
-    stage('Docker Login') {
+    stage('Build') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
-                                          usernameVariable: 'DOCKERHUB_USER',
-                                          passwordVariable: 'DOCKERHUB_PASS')]) {
-          bat '''
-          echo %DOCKERHUB_PASS% | docker login -u %DOCKERHUB_USER% --password-stdin
-          '''
+        bat 'echo "Mulai build aplikasi (Windows)"'
+      }
+    }
+
+    stage('Build Docker Image') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: env.REGISTRY_CREDENTIALS, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+          bat """
+            echo Login Docker sebelum build...
+            docker login -u %USER% -p %PASS%
+            docker build -t ${env.IMAGE_NAME}:${env.BUILD_NUMBER} .
+            docker logout
+          """
         }
       }
     }
 
-    stage('Build Dev Image') {
+    stage('Push Docker Image') {
       steps {
-        bat '''
-        docker build -t pioaprilio/cloud_mobile:%BUILD_NUMBER% -t pioaprilio/cloud_mobile:latest --target dev .
-        '''
-      }
-    }
-
-    stage('Push Dev Image') {
-      steps {
-        bat '''
-        docker push pioaprilio/cloud_mobile:%BUILD_NUMBER%
-        docker push pioaprilio/cloud_mobile:latest
-        '''
-      }
-    }
-
-    stage('Build & Push Web Image') {
-      steps {
-        bat '''
-        docker build -t pioaprilio/cloud_mobile-web:%BUILD_NUMBER% -t pioaprilio/cloud_mobile-web:latest --target web .
-        docker push pioaprilio/cloud_mobile-web:%BUILD_NUMBER%
-        docker push pioaprilio/cloud_mobile-web:latest
-        '''
+        withCredentials([usernamePassword(credentialsId: env.REGISTRY_CREDENTIALS, usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+          bat """
+            echo Login Docker untuk push...
+            docker login -u %USER% -p %PASS%
+            docker push ${env.IMAGE_NAME}:${env.BUILD_NUMBER}
+            docker tag ${env.IMAGE_NAME}:${env.BUILD_NUMBER} ${env.IMAGE_NAME}:latest
+            docker push ${env.IMAGE_NAME}:latest
+            docker logout
+          """
+        }
       }
     }
   }
 
   post {
     always {
-      bat 'docker logout || ver >NUL'
+      echo 'Selesai build pipeline.'
     }
   }
 }
